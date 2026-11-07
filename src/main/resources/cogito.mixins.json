@@ -1,0 +1,23 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.cogito.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "BlockItemAccessor",
+    "ClientAdvancementsAccessor",
+    "ClientPacketListenerMixin",
+    "ContainerScreenAccessor",
+    "FishingHookAccessor",
+    "GuiAccessor",
+    "InputConstantsMixin",
+    "KeyboardHandlerInvoker",
+    "KeyboardHandlerMixin",
+    "MinecraftMixin",
+    "MouseHandlerInvoker",
+    "MouseHandlerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

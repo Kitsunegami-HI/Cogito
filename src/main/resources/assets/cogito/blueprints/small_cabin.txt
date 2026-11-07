@@ -1,0 +1,50 @@
+description: a small plank cabin on a cobblestone floor, door on the south side, windows east and west, flat roof
+ground_layer: 1
+palette:
+c minecraft:cobblestone
+O minecraft:oak_planks
+L minecraft:oak_log
+G minecraft:glass_pane
+D minecraft:oak_door[facing=north,half=lower,hinge=left]
+d minecraft:oak_door[facing=north,half=upper,hinge=left]
+t minecraft:torch
+layer 0
+ccccccc
+ccccccc
+ccccccc
+ccccccc
+ccccccc
+ccccccc
+ccccccc
+layer 1
+LOOOOOL
+Ot...tO
+O.....O
+O.....O
+O.....O
+O.....O
+LOODOOL
+layer 2
+LOOOOOL
+O.....O
+G.....G
+O.....O
+G.....G
+O.....O
+LOOdOOL
+layer 3
+LOOOOOL
+O.....O
+O.....O
+O.....O
+O.....O
+O.....O
+LOOOOOL
+layer 4
+OOOOOOO
+OOOOOOO
+OOOOOOO
+OOOOOOO
+OOOOOOO
+OOOOOOO
+OOOOOOO

@@ -1,0 +1,28 @@
+# Build output and Gradle caches
+build/
+.gradle/
+out/
+
+# Game folders of dev runs: worlds, memory, traces, tokens
+run/
+run2/
+
+# Secrets and private settings, should any end up here
+.env
+*.env
+dev-settings/
+
+# The optional dataset module lives outside the repository
+dataset/
+cogito-dataset/
+
+# IDEs and OS files
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+.DS_Store
+Thumbs.db

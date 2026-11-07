@@ -1,0 +1,21 @@
+description: the cheapest roof over your head for a first night, dirt only, with a gap to walk in on the south side
+palette:
+# minecraft:dirt
+layer 0
+#####
+#...#
+#...#
+#...#
+##.##
+layer 1
+#####
+#...#
+#...#
+#...#
+##.##
+layer 2
+#####
+#####
+#####
+#####
+#####

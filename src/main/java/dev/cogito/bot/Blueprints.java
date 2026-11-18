@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -172,25 +173,25 @@ public final class Blueprints {
 
     /** The game's own structure block format: a palette, and a list of the cells that have a block. */
     private static Blueprint readStructure(String name, CompoundTag tag, String source) {
-        ListTag size = tag.getListOrEmpty("size");
-        int width = size.getIntOr(0, 0);
-        int height = size.getIntOr(1, 0);
-        int length = size.getIntOr(2, 0);
-        ListTag palette = tag.getListOrEmpty("palette");
+        ListTag size = Mc.list(tag, "size");
+        int width = Mc.intAt(size, 0);
+        int height = Mc.intAt(size, 1);
+        int length = Mc.intAt(size, 2);
+        ListTag palette = Mc.list(tag, "palette");
         if (palette.isEmpty()) {
-            palette = tag.getListOrEmpty("palettes").getListOrEmpty(0);
+            palette = Mc.list(Mc.list(tag, "palettes"), 0);
         }
         BlockState[] states = new BlockState[palette.size()];
         for (int i = 0; i < states.length; i++) {
-            BlockState state = NbtUtils.readBlockState(BuiltInRegistries.BLOCK, palette.getCompoundOrEmpty(i));
+            BlockState state = NbtUtils.readBlockState(Mc.blockLookup(), Mc.compound(palette, i));
             states[i] = state.is(Blocks.STRUCTURE_VOID) ? null : state;
         }
         BlockState[] cells = Blueprint.newCells(width, height, length);
-        ListTag blocks = tag.getListOrEmpty("blocks");
+        ListTag blocks = Mc.list(tag, "blocks");
         for (int i = 0; i < blocks.size(); i++) {
-            CompoundTag block = blocks.getCompoundOrEmpty(i);
-            ListTag pos = block.getListOrEmpty("pos");
-            Blueprint.put(cells, width, length, pos.getIntOr(0, 0), pos.getIntOr(1, 0), pos.getIntOr(2, 0), states[block.getIntOr("state", 0)]);
+            CompoundTag block = Mc.compound(blocks, i);
+            ListTag pos = Mc.list(block, "pos");
+            Blueprint.put(cells, width, length, Mc.intAt(pos, 0), Mc.intAt(pos, 1), Mc.intAt(pos, 2), states[Mc.intOf(block, "state")]);
         }
         return new Blueprint(name, "", source, width, height, length, 0, cells);
     }
@@ -416,7 +417,7 @@ public final class Blueprints {
         JsonObject out = new JsonObject();
         all.forEach((name, row) -> out.add(name, J.obj("x", row.origin().getX(), "y", row.origin().getY(), "z", row.origin().getZ(), "rotation", row.rotation())));
         MemoryStore.writeWorldFile(key, BUILDS_FILE, new GsonBuilder().setPrettyPrinting().create().toJson(out));
-        MemoryStore.notePlace("build_" + placement.name(), placement.origin(), Bot.call(() -> Bot.level().dimension().identifier().toString()), "where the blueprint " + placement.name() + " was started");
+        MemoryStore.notePlace("build_" + placement.name(), placement.origin(), Bot.call(() -> Mc.dimension(Bot.level())), "where the blueprint " + placement.name() + " was started");
     }
 
     /** Worker thread. Every block the blueprints started in this world call for: what was built here is not a place to fetch materials from. */
@@ -456,7 +457,7 @@ public final class Blueprints {
     private static int groundHeight(int x, int z) {
         var level = Bot.level();
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z), z);
-        while (cursor.getY() > level.getMinY()) {
+        while (cursor.getY() > Mc.minY(level)) {
             cursor.move(0, -1, 0);
             BlockState state = level.getBlockState(cursor);
             if (!state.getFluidState().isEmpty()) {
@@ -774,7 +775,7 @@ public final class Blueprints {
             OPEN_BEFORE.remove(buildKey);
             // The first roof of one's own is home, until the agent decides otherwise.
             if (MemoryStore.place("home") == null) {
-                MemoryStore.notePlace("home", placement.origin(), Bot.call(() -> Bot.level().dimension().identifier().toString()),
+                MemoryStore.notePlace("home", placement.origin(), Bot.call(() -> Mc.dimension(Bot.level())),
                         "the " + blueprint.name + " built here" + (blueprint.description.isEmpty() ? "" : ": " + blueprint.description));
             }
         }

@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import dev.cogito.memory.MemoryStore;
@@ -106,8 +107,8 @@ final class WorldFns {
                 "oxygen", p.getAirSupply(),
                 "xp_level", p.experienceLevel,
                 "gamemode", mc.gameMode == null ? "unknown" : mc.gameMode.getPlayerMode().getName(),
-                "dimension", level.dimension().identifier().toString(),
-                "biome", level.getBiome(p.blockPosition()).unwrapKey().map(key -> key.identifier().toString()).orElse("unknown"),
+                "dimension", Mc.dimension(level),
+                "biome", level.getBiome(p.blockPosition()).unwrapKey().map(Mc::key).orElse("unknown"),
                 "time", time(),
                 "raining", level.isRaining(), "thundering", level.isThundering(),
                 "on_ground", p.onGround(), "in_water", p.isInWater(), "in_lava", p.isInLava(),
@@ -118,7 +119,7 @@ final class WorldFns {
         if (!p.getActiveEffects().isEmpty()) {
             JsonObject effects = new JsonObject();
             for (net.minecraft.world.effect.MobEffectInstance effect : p.getActiveEffects()) {
-                effects.addProperty(effect.getEffect().unwrapKey().map(key -> key.identifier().toString()).orElse("unknown"),
+                effects.addProperty(effect.getEffect().unwrapKey().map(Mc::key).orElse("unknown"),
                         effect.isInfiniteDuration() ? -1 : effect.getDuration() / 20);
             }
             out.add("effects_seconds_left", effects);
@@ -134,7 +135,7 @@ final class WorldFns {
     }
 
     private static JsonObject time() {
-        long day = Bot.level().getOverworldClockTime();
+        long day = Mc.dayTime(Bot.level());
         long tod = day % 24000;
         return J.obj("day", day / 24000, "tick_of_day", tod, "phase", tod < 12000 ? "day" : tod < 13000 ? "dusk" : tod < 23000 ? "night" : "dawn");
     }
@@ -150,7 +151,7 @@ final class WorldFns {
                 stacks.add(row);
             }
         }
-        return J.obj("selected_hotbar_slot", inv.getSelectedSlot(), "free_slots", WindowFns.freeSlots(), "stacks", stacks);
+        return J.obj("selected_hotbar_slot", Mc.selectedSlot(inv), "free_slots", WindowFns.freeSlots(), "stacks", stacks);
     }
 
     static JsonObject blockJson(BlockPos pos) {
@@ -181,7 +182,7 @@ final class WorldFns {
             out.addProperty("data", blockEntityData(entity));
         }
         JsonArray tags = new JsonArray();
-        state.typeHolder().tags().limit(24).forEach(tag -> tags.add("#" + tag.location()));
+        Mc.tags(state).limit(24).forEach(tag -> tags.add("#" + tag.location()));
         out.add("tags", tags);
         Item asItem = state.getBlock().asItem();
         if (asItem != net.minecraft.world.item.Items.AIR) {
@@ -235,7 +236,7 @@ final class WorldFns {
             out.addProperty("places", BuiltInRegistries.BLOCK.getKey(blockItem.getBlock()).toString());
         }
         JsonArray tags = new JsonArray();
-        stack.typeHolder().tags().limit(24).forEach(tag -> tags.add("#" + tag.location()));
+        Mc.tags(stack).limit(24).forEach(tag -> tags.add("#" + tag.location()));
         out.add("tags", tags);
         addExplanationHint(out, Bot.itemId(stack));
         return out;
@@ -259,8 +260,8 @@ final class WorldFns {
         Comparator<BlockPos> nearest = Comparator.comparingDouble(pos -> pos.distSqr(center));
         PriorityQueue<BlockPos> kept = new PriorityQueue<>(count + 1, nearest.reversed());
         int total = 0;
-        int minY = Math.max(level.getMinY(), center.getY() - radius);
-        int maxY = Math.min(level.getMaxY(), center.getY() + radius);
+        int minY = Math.max(Mc.minY(level), center.getY() - radius);
+        int maxY = Math.min(Mc.maxY(level), center.getY() + radius);
         for (int chunkX = (center.getX() - radius) >> 4; chunkX <= (center.getX() + radius) >> 4; chunkX++) {
             for (int chunkZ = (center.getZ() - radius) >> 4; chunkZ <= (center.getZ() + radius) >> 4; chunkZ++) {
                 LevelChunk chunk = level.getChunkSource().getChunk(chunkX, chunkZ, false);
@@ -300,7 +301,7 @@ final class WorldFns {
         if (!found.isEmpty() && Math.sqrt(found.get(0).distSqr(center)) >= WORTH_REMEMBERING) {
             BlockPos first = found.get(0);
             String id = Bot.blockId(level.getBlockState(first));
-            MemoryStore.notePlace("seen_" + id.substring(id.indexOf(':') + 1), first, level.dimension().identifier().toString(), "sighted from afar by findBlocks");
+            MemoryStore.notePlace("seen_" + id.substring(id.indexOf(':') + 1), first, Mc.dimension(level), "sighted from afar by findBlocks");
         }
         JsonArray out = new JsonArray();
         for (BlockPos pos : found) {
@@ -335,7 +336,7 @@ final class WorldFns {
             if (entity == player || !entity.isAlive() || entity.distanceTo(player) > radius) {
                 continue;
             }
-            if (type == null || BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).equals(Bot.id(type))) {
+            if (type == null || BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).equals(Mc.id(type))) {
                 out.add(entity);
             }
         }
@@ -363,9 +364,9 @@ final class WorldFns {
         JsonArray out = new JsonArray();
         LocalPlayer me = Bot.player();
         me.connection.getOnlinePlayers().forEach(info -> {
-            JsonObject row = J.obj("name", info.getProfile().name(), "latency_ms", info.getLatency());
+            JsonObject row = J.obj("name", Mc.profileName(info.getProfile()), "latency_ms", info.getLatency());
             Bot.level().players().stream()
-                    .filter(p -> p.getUUID().equals(info.getProfile().id()))
+                    .filter(p -> p.getUUID().equals(Mc.profileId(info.getProfile())))
                     .findFirst()
                     .ifPresent(p -> row.addProperty("distance", Math.round(p.distanceTo(me))));
             out.add(row);

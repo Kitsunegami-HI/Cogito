@@ -1,12 +1,12 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.cogito.CogitoMod;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.tags.BlockTags;
@@ -185,11 +185,11 @@ final class Sources {
 
     /** True if plain mining gives this block's item. Glass, for one, needs silk touch, and breaks into nothing without it. */
     private static boolean readDropsItself(Block block) {
-        Identifier id = BuiltInRegistries.BLOCK.getKey(block);
-        if (!id.getNamespace().equals(Identifier.DEFAULT_NAMESPACE)) {
+        var id = BuiltInRegistries.BLOCK.getKey(block);
+        if (!id.getNamespace().equals(Mc.DEFAULT_NAMESPACE)) {
             return true;
         }
-        Identifier table = Identifier.withDefaultNamespace("loot_table/blocks/" + id.getPath() + ".json");
+        var table = Mc.vanillaId("loot_table/blocks/" + id.getPath() + ".json");
         IoSupplier<InputStream> resource = Bot.mc().getVanillaPackResources().getResource(PackType.SERVER_DATA, table);
         if (resource == null) {
             return false;
@@ -375,16 +375,16 @@ final class Sources {
         List<String> plain = new ArrayList<>();
         Set<Block> out = new LinkedHashSet<>();
         for (String name : names) {
-            String id = name.startsWith("#") ? name : Bot.id(name).toString();
-            if (!id.startsWith("#") && net.minecraft.core.registries.BuiltInRegistries.ITEM.getOptional(Bot.id(id)).map(DROPS::containsKey).orElse(false)
-                    && net.minecraft.core.registries.BuiltInRegistries.BLOCK.getOptional(Bot.id(id)).isEmpty()) {
+            String id = name.startsWith("#") ? name : Mc.id(name).toString();
+            if (!id.startsWith("#") && net.minecraft.core.registries.BuiltInRegistries.ITEM.getOptional(Mc.id(id)).map(DROPS::containsKey).orElse(false)
+                    && net.minecraft.core.registries.BuiltInRegistries.BLOCK.getOptional(Mc.id(id)).isEmpty()) {
                 out.addAll(DROPS.get(Bot.item(id)));
                 continue;
             }
             plain.add(id);
             if (id.endsWith("_ore") && !id.contains("deepslate_") && !id.contains("nether_")) {
                 String deepslate = id.replace(":", ":deepslate_");
-                if (net.minecraft.core.registries.BuiltInRegistries.BLOCK.getOptional(Bot.id(deepslate)).isPresent()) {
+                if (net.minecraft.core.registries.BuiltInRegistries.BLOCK.getOptional(Mc.id(deepslate)).isPresent()) {
                     plain.add(deepslate);
                 }
             }

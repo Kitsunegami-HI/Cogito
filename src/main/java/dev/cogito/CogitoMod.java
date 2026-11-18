@@ -1,5 +1,7 @@
 package dev.cogito;
 
+import dev.cogito.compat.Mc;
+import dev.cogito.compat.Canvas;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.logging.LogUtils;
 import dev.cogito.agent.AgentLoop;
@@ -62,11 +64,9 @@ public final class CogitoMod {
     }
 
     private void registerKeys(RegisterKeyMappingsEvent event) {
-        TAKEOVER_KEY = new KeyMapping("key.cogito.takeover", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_F8,
-                KeyMapping.Category.MISC);
+        TAKEOVER_KEY = Mc.keyMapping("key.cogito.takeover", GLFW.GLFW_KEY_F8);
         event.register(TAKEOVER_KEY);
-        SETTINGS_KEY = new KeyMapping("key.cogito.settings", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_F9,
-                KeyMapping.Category.MISC);
+        SETTINGS_KEY = Mc.keyMapping("key.cogito.settings", GLFW.GLFW_KEY_F9);
         event.register(SETTINGS_KEY);
     }
 
@@ -96,12 +96,12 @@ public final class CogitoMod {
 
     private void onRenderGui(RenderGuiEvent.Post event) {
         if (Minecraft.getInstance().screen == null) {
-            Overlay.draw(event.getGuiGraphics(), false);
+            Overlay.draw(new Canvas(event.getGuiGraphics()), false);
         }
     }
 
     private void onRenderScreen(ScreenEvent.Render.Post event) {
-        Overlay.draw(event.getGuiGraphics(), true);
+        Overlay.draw(new Canvas(event.getGuiGraphics()), true);
     }
 
     /** A link would leave the game, and the model settings hold the person's keys, so the AI may open neither. */

@@ -5,8 +5,8 @@ import dev.cogito.agent.AgentLoop;
 import dev.cogito.control.Control;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.MouseHandler;
+import dev.cogito.compat.Canvas;
+import dev.cogito.compat.Input;
 
 import java.util.List;
 import java.util.Set;
@@ -32,7 +32,7 @@ public final class Overlay {
         }
     }
 
-    public static void draw(GuiGraphicsExtractor graphics, boolean screenOpen) {
+    public static void draw(Canvas graphics, boolean screenOpen) {
         Minecraft mc = Minecraft.getInstance();
         if (!quietReasons.isEmpty()) {
             // What a model trains on must match what it sees later, whoever is driving: no banner, the same cursor.
@@ -70,10 +70,9 @@ public final class Overlay {
     }
 
     /** With a screen open the OS cursor is free, so the AI's cursor is drawn by hand. */
-    private static void drawCursor(GuiGraphicsExtractor graphics, Minecraft mc) {
-        MouseHandler mouse = mc.mouseHandler;
-        int x = (int) mouse.getScaledXPos(mc.getWindow());
-        int y = (int) mouse.getScaledYPos(mc.getWindow());
+    private static void drawCursor(Canvas graphics, Minecraft mc) {
+        int x = (int) Input.guiMouseX();
+        int y = (int) Input.guiMouseY();
         for (int row = 0; row < 9; row++) {
             int span = Math.min(row + 1, 6);
             graphics.fill(x - 1, y + row - 1, x + span + 1, y + row + 2, 0xFF000000);

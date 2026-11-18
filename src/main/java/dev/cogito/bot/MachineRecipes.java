@@ -1,10 +1,11 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
+import dev.cogito.compat.Recipes;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.serialization.JsonOps;
-import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.item.Item;
@@ -19,8 +20,8 @@ import java.util.List;
 
 /**
  * Every non-crafting recipe, of any mod, read through the game's own recipe codec: the JSON shows what the
- * machine takes and makes without knowing the mod. Only a singleplayer world holds the recipes; a server keeps
- * them to itself, and there the answer says so instead of looking like "no recipe".
+ * machine takes and makes without knowing the mod. Where the client holds no recipes (a server on
+ * Minecraft 26.1 keeps them to itself), the answer says so instead of looking like "no recipe".
  */
 final class MachineRecipes {
     private static final int CLIP = 400;
@@ -33,11 +34,10 @@ final class MachineRecipes {
     private MachineRecipes() {}
 
     private static List<Entry> all() {
-        IntegratedServer server = Bot.mc().getSingleplayerServer();
-        if (server == null) {
+        RecipeManager manager = Recipes.everyRecipe();
+        if (manager == null) {
             return null;
         }
-        RecipeManager manager = server.getRecipeManager();
         if (manager != cachedFor) {
             RegistryOps<JsonElement> ops = Bot.level().registryAccess().createSerializationContext(JsonOps.INSTANCE);
             List<Entry> entries = new ArrayList<>();
@@ -49,7 +49,7 @@ final class MachineRecipes {
                 // A recipe its mod cannot write out is skipped, not fatal: the others still answer.
                 Recipe.CODEC.encodeStart(ops, recipe).result()
                         .filter(JsonElement::isJsonObject)
-                        .ifPresent(json -> entries.add(new Entry(holder.id().identifier().toString(), json.getAsJsonObject())));
+                        .ifPresent(json -> entries.add(new Entry(Recipes.id(holder), json.getAsJsonObject())));
             }
             cache = entries;
             cachedFor = manager;
@@ -103,7 +103,7 @@ final class MachineRecipes {
     static JsonObject using(Item item, int limit) {
         List<String> needles = new ArrayList<>();
         needles.add("\"" + BuiltInRegistries.ITEM.getKey(item) + "\"");
-        new ItemStack(item).typeHolder().tags().forEach(tag -> {
+        Mc.tags(new ItemStack(item)).forEach(tag -> {
             needles.add("\"#" + tag.location() + "\"");
             needles.add("\"" + tag.location() + "\"");
         });

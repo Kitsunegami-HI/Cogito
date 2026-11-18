@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class KeyboardHandlerMixin {
     @Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
     private void cogito$keyPress(long handle, int action, KeyEvent event, CallbackInfo ci) {
-        if (Control.onRealKey(action, event) || Control.blocksRealInput()) {
+        if (Control.onRealKey(action, event.key()) || Control.blocksRealInput()) {
             ci.cancel();
         }
     }

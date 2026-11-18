@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonObject;
 import dev.cogito.agent.Reflexes;
 import dev.cogito.control.Control;
@@ -13,7 +14,6 @@ import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -146,18 +146,19 @@ public final class Bot {
         return level;
     }
 
-    public static Identifier id(String raw) {
-        Identifier parsed = Identifier.tryParse(raw.contains(":") ? raw : "minecraft:" + raw);
-        if (parsed == null) {
-            throw new ApiError("bad_argument", "'" + raw + "' is not a valid id");
-        }
-        return parsed;
-    }
-
     public static Item item(String raw) {
-        return BuiltInRegistries.ITEM.getOptional(id(raw))
+        return BuiltInRegistries.ITEM.getOptional(Mc.id(raw))
                 .orElseThrow(() -> new ApiError("bad_argument", "no item named '" + raw + "'",
                         "describeBlock or recipesAll show real ids"));
+    }
+
+    /** The items of these ids that this Minecraft version has; ids it lacks are left out. */
+    public static Set<Item> itemsPresent(String... ids) {
+        Set<Item> out = new LinkedHashSet<>();
+        for (String raw : ids) {
+            BuiltInRegistries.ITEM.getOptional(Mc.id(raw)).ifPresent(out::add);
+        }
+        return java.util.Collections.unmodifiableSet(out);
     }
 
     public static String itemId(ItemStack stack) {
@@ -216,11 +217,11 @@ public final class Bot {
             return false;
         }
         if (wanted.startsWith("#")) {
-            return stack.is(TagKey.create(Registries.ITEM, id(wanted.substring(1))));
+            return stack.is(TagKey.create(Registries.ITEM, Mc.id(wanted.substring(1))));
         }
         int hash = wanted.indexOf('#');
         if (hash > 0) {
-            return stack.getItem() == item(wanted.substring(0, hash)) && potionIdOf(stack).equals(id(wanted.substring(hash + 1)).toString());
+            return stack.getItem() == item(wanted.substring(0, hash)) && potionIdOf(stack).equals(Mc.id(wanted.substring(hash + 1)).toString());
         }
         return stack.getItem() == item(wanted);
     }
@@ -236,7 +237,7 @@ public final class Bot {
         if (contents == null || contents.potion().isEmpty()) {
             return "";
         }
-        return contents.potion().get().unwrapKey().map(key -> key.identifier().toString()).orElse("");
+        return contents.potion().get().unwrapKey().map(Mc::key).orElse("");
     }
 
     /** Block ids or #tags to the blocks they name. */
@@ -244,10 +245,10 @@ public final class Bot {
         Set<Block> out = new LinkedHashSet<>();
         for (String name : names) {
             if (name.startsWith("#")) {
-                TagKey<Block> tag = TagKey.create(Registries.BLOCK, id(name.substring(1)));
+                TagKey<Block> tag = TagKey.create(Registries.BLOCK, Mc.id(name.substring(1)));
                 BuiltInRegistries.BLOCK.getTagOrEmpty(tag).forEach(holder -> out.add(holder.value()));
             } else {
-                BuiltInRegistries.BLOCK.getOptional(id(name)).ifPresent(out::add);
+                BuiltInRegistries.BLOCK.getOptional(Mc.id(name)).ifPresent(out::add);
             }
         }
         if (out.isEmpty()) {

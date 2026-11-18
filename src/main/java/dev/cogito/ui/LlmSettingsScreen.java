@@ -1,5 +1,6 @@
 package dev.cogito.ui;
 
+import dev.cogito.compat.Widgets;
 import dev.cogito.llm.Llm;
 import dev.cogito.llm.LlmSettings;
 import net.minecraft.ChatFormatting;
@@ -8,15 +9,12 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.MultiLineTextWidget;
-import net.minecraft.client.gui.components.ScrollableLayout;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.util.FormattedCharSequence;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -45,7 +43,7 @@ public final class LlmSettingsScreen extends Screen {
     private Component status = Component.empty();
 
     private HeaderAndFooterLayout layout;
-    private ScrollableLayout scroller;
+    private Widgets.Scroller scroller;
     private MultiLineTextWidget statusText;
     private MultiLineTextWidget keyState;
     private StringWidget kindLabel;
@@ -109,7 +107,7 @@ public final class LlmSettingsScreen extends Screen {
 
         body.addChild(heading("cogito.llm.providers"));
         LinearLayout pick = LinearLayout.horizontal().spacing(GAP);
-        pick.addChild(CycleButton.builder((Draft d) -> Component.literal(d.name.equals(d.kind.label) ? d.name : d.name + " · " + d.kind.label),
+        pick.addChild(Widgets.cycle((Draft d) -> Component.literal(d.name.equals(d.kind.label) ? d.name : d.name + " · " + d.kind.label),
                         drafts.get(editing))
                 .withValues(drafts)
                 .create(0, 0, WIDTH - 64 - GAP, 20, Component.translatable("cogito.llm.editing"), (button, draft) -> switchTo(draft)));
@@ -127,7 +125,7 @@ public final class LlmSettingsScreen extends Screen {
         baseUrl = field(body, "cogito.llm.base_url", 256, "cogito.llm.base_url.tip");
         key = field(body, "cogito.llm.key", 512, "cogito.llm.key.tip");
         // What is typed shows as stars; the key itself is never put back into the box.
-        key.addFormatter((text, offset) -> FormattedCharSequence.forward("*".repeat(text.length()), Style.EMPTY));
+        Widgets.mask(key);
         key.setResponder(s -> refreshKeyState());
         LinearLayout keyRow = LinearLayout.horizontal().spacing(GAP);
         keyState = keyRow.addChild(new MultiLineTextWidget(Component.empty(), font).setMaxWidth(WIDTH - 90 - GAP));
@@ -150,7 +148,7 @@ public final class LlmSettingsScreen extends Screen {
         body.addChild(new MultiLineTextWidget(Component.translatable("cogito.llm.where", LlmSettings.DIR.toString())
                 .withStyle(ChatFormatting.GRAY), font).setMaxWidth(WIDTH));
 
-        scroller = new ScrollableLayout(minecraft, body, layout.getContentHeight());
+        scroller = new Widgets.Scroller(minecraft, body, layout.getContentHeight());
         layout.addToContents(scroller);
 
         LinearLayout footer = LinearLayout.vertical().spacing(GAP);
@@ -171,9 +169,13 @@ public final class LlmSettingsScreen extends Screen {
         if (layout == null) {
             return;
         }
-        scroller.arrangeElements();
-        scroller.setMaxHeight(layout.getContentHeight());
+        scroller.fit(layout.getContentHeight());
         layout.arrangeElements();
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        return (scroller != null && scroller.scrolled(mouseX, mouseY, scrollY)) || super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
@@ -197,7 +199,7 @@ public final class LlmSettingsScreen extends Screen {
         LinearLayout row = LinearLayout.horizontal().spacing(GAP);
         row.addChild(label(label, 60));
         List<String> ids = drafts.stream().map(d -> d.id).toList();
-        CycleButton<String> provider = CycleButton.builder((String id) -> Component.literal(nameOf(id)), role.profile)
+        CycleButton<String> provider = Widgets.cycle((String id) -> Component.literal(nameOf(id)), role.profile)
                 .withValues(ids)
                 .displayOnlyValue()
                 .create(0, 0, 104, 20, Component.translatable("cogito.llm.provider"), (button, id) -> role.profile = id);
@@ -209,7 +211,7 @@ public final class LlmSettingsScreen extends Screen {
         model.setHint(Component.translatable("cogito.llm.model.hint").withStyle(ChatFormatting.DARK_GRAY));
         model.setTooltip(Tooltip.create(Component.translatable("cogito.llm.model.tip")));
         row.addChild(model);
-        CycleButton<String> effort = CycleButton.builder((String e) -> Component.translatable("cogito.llm.effort." + e), role.effort)
+        CycleButton<String> effort = Widgets.cycle((String e) -> Component.translatable("cogito.llm.effort." + e), role.effort)
                 .withValues(LlmSettings.EFFORTS)
                 .displayOnlyValue()
                 .create(0, 0, 80, 20, Component.translatable("cogito.llm.effort"), (button, e) -> role.effort = e);

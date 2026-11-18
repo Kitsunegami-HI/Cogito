@@ -1,5 +1,6 @@
 package dev.cogito.agent;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import dev.cogito.memory.MemoryStore;
@@ -85,7 +86,7 @@ public final class GameEvents {
         boolean dead = mc.screen instanceof DeathScreen;
         if (dead && !wasDead) {
             BlockPos at = player.blockPosition();
-            String dimension = player.level().dimension().identifier().toString();
+            String dimension = Mc.dimension(player.level());
             DamageSource source = player.getLastDamageSource();
             String cause = source == null ? "unknown cause" : source.getLocalizedDeathMessage(player).getString();
             add("death", "Died at " + at.toShortString() + " in " + dimension + ": " + cause

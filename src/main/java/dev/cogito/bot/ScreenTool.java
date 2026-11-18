@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Input;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.Window;
@@ -345,7 +346,7 @@ public final class ScreenTool {
         }
         out.addProperty("title", screen.getTitle().getString());
         Window window = mc.getWindow();
-        int[] cursor = guiToShot(mc.mouseHandler.getScaledXPos(window), mc.mouseHandler.getScaledYPos(window));
+        int[] cursor = guiToShot(Input.guiMouseX(), Input.guiMouseY());
         out.add("cursor", J.nums(cursor[0], cursor[1]));
         JsonArray widgets = new JsonArray();
         collectWidgets(screen.children(), widgets, 0);

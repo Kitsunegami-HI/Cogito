@@ -1,0 +1,258 @@
+import org.gradle.api.artifacts.transform.InputArtifact
+import org.gradle.api.artifacts.transform.TransformAction
+import org.gradle.api.artifacts.transform.TransformOutputs
+import org.gradle.api.artifacts.transform.TransformParameters
+
+// The build shared by every Minecraft version Cogito supports. Each version is a build of its own that applies the
+// moddev plugin and then this script: the repository root builds 26.1.2, versions/<minecraft version>/ the others.
+// Code that compiles unchanged on every version lives in src/main; code that differs lives in
+// versions/<minecraft version>/src/main under the same class names, so the shared code calls it the same way everywhere.
+// A version's gradle.properties names what differs (Minecraft, NeoForge, Java, Baritone and the libraries the game
+// ships itself); the mod's own fields come from the repository's gradle.properties.
+
+def repoDir = buildscript.sourceFile.parentFile.parentFile
+def shared = new Properties()
+new File(repoDir, 'gradle.properties').withInputStream { shared.load(it) }
+['mod_id', 'mod_name', 'mod_license', 'mod_version', 'mod_group_id',
+ 'anthropic_java_version', 'openai_java_version', 'google_genai_version'].each { key ->
+    if (!project.hasProperty(key)) {
+        project.ext.set(key, shared.getProperty(key))
+    }
+}
+def versionDir = new File(repoDir, "versions/${minecraft_version}")
+
+// A version other than the repository root's adds its Minecraft version to the jar name (cogito-0.3.0+mc1.21.1.jar), so the
+// jars of different versions cannot be mixed up; the mod's own version stays mod_version.
+version = mod_version + (project.findProperty('jar_version_suffix') ?: '')
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(java_version as int)
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets.main {
+    java.srcDirs = [new File(repoDir, 'src/main/java'), new File(versionDir, 'src/main/java')]
+    resources.srcDirs = [new File(repoDir, 'src/main/resources'), new File(versionDir, 'src/main/resources')]
+}
+
+// The dev run reads the API key from AIplayer/.env; the key never enters the build output.
+def envFile = new File(repoDir, '../.env').absolutePath
+// Dev runs keep their model provider settings beside it, outside the game folder, and away from the real ones in %APPDATA%.
+def devSettingsDir = new File(repoDir, '../dev-settings').absolutePath
+
+// -PtestBuiltJar runs the packaged jar with default settings, as an installed copy would behave:
+// its bundled libraries are the only source of the SDK, and the dev-only switches stay off.
+// -PreleaseTest goes further, as a friend would install the release: a fresh game folder (build/release-test/game)
+// whose mods folder holds the jars, no dev .env, and a settings folder of its own instead of the real one in %APPDATA%.
+def releaseTest = project.hasProperty('releaseTest')
+def testBuiltJar = project.hasProperty('testBuiltJar') || releaseTest
+
+neoForge {
+    version = project.neo_version
+
+    runs {
+        client {
+            client()
+            if (releaseTest) {
+                gameDirectory = project.file('build/release-test/game')
+                systemProperty 'cogito.settingsDir', project.file('build/release-test/settings').absolutePath
+                programArguments.addAll '--quickPlaySingleplayer', 'AI Test A'
+                return
+            }
+            systemProperty 'cogito.envFile', envFile
+            systemProperty 'cogito.settingsDir', devSettingsDir
+            if (testBuiltJar) {
+                programArguments.addAll '--quickPlaySingleplayer', project.findProperty('quickPlay') ?: 'AI Test A'
+            } else {
+                // Dev-only switches: the test run drives menus and takes control over MCP.
+                systemProperty 'cogito.allowMenus', 'true'
+                systemProperty 'cogito.allowExternalTakeover', 'true'
+                systemProperty 'cogito.devOfflineLan', 'true'
+                // -PquickPlay=<world> opens that world straight away.
+                if (project.hasProperty('quickPlay')) {
+                    programArguments.addAll '--quickPlaySingleplayer', project.quickPlay
+                }
+            }
+        }
+        // A second player for testing the multiplayer path: open the first client to LAN on 25565, then run this.
+        client2 {
+            client()
+            gameDirectory = project.file('run2')
+            systemProperty 'cogito.envFile', envFile
+            systemProperty 'cogito.settingsDir', devSettingsDir
+            systemProperty 'cogito.allowMenus', 'true'
+            systemProperty 'cogito.allowExternalTakeover', 'true'
+            programArguments.addAll '--username', 'Bot2', '--quickPlayMultiplayer', '127.0.0.1:25565'
+        }
+    }
+
+    if (!testBuiltJar) {
+        mods {
+            "${mod_id}" {
+                sourceSet(sourceSets.main)
+            }
+        }
+    }
+}
+
+// Jar-in-jar refuses a library without a Java module name, and some SDK jars have none (the OpenAI SDK's,
+// and grpc-context and OpenCensus under Google's auth library). This gives each such jar a name taken from its
+// file name, the same name the JVM would derive for it, and changes nothing else in it.
+abstract class AddModuleName implements TransformAction<TransformParameters.None> {
+    @InputArtifact
+    abstract Provider<FileSystemLocation> getInputArtifact()
+
+    @Override
+    void transform(TransformOutputs outputs) {
+        File input = inputArtifact.get().asFile
+        def zip = new java.util.zip.ZipFile(input)
+        boolean named
+        try {
+            def entry = zip.getEntry('META-INF/MANIFEST.MF')
+            String manifest = entry == null ? '' : zip.getInputStream(entry).getText('UTF-8')
+            named = zip.getEntry('module-info.class') != null || manifest.contains('Automatic-Module-Name:')
+                    || zip.entries().toList().any { it.name ==~ /META-INF\/versions\/\d+\/module-info\.class/ }
+        } finally {
+            zip.close()
+        }
+        if (named) {
+            outputs.file(inputArtifact)
+            return
+        }
+        String base = input.name.replaceFirst(/\.jar$/, '').replaceFirst(/-\d[\w.\-]*$/, '')
+        String moduleName = base.split(/[^A-Za-z0-9]+/).findAll { it }.collect { Character.isDigit(it.charAt(0)) ? '_' + it : it }.join('.')
+        File output = outputs.file(input.name)
+        def source = new java.util.jar.JarFile(input)
+        try {
+            def manifest = source.manifest ?: new java.util.jar.Manifest()
+            if (manifest.mainAttributes.getValue('Manifest-Version') == null) {
+                manifest.mainAttributes.putValue('Manifest-Version', '1.0')
+            }
+            manifest.mainAttributes.putValue('Automatic-Module-Name', moduleName)
+            new java.util.jar.JarOutputStream(new FileOutputStream(output), manifest).withCloseable { out ->
+                source.entries().each { e ->
+                    if (e.name.equalsIgnoreCase('META-INF/MANIFEST.MF')) {
+                        return
+                    }
+                    out.putNextEntry(new java.util.jar.JarEntry(e.name))
+                    if (!e.directory) {
+                        source.getInputStream(e).withCloseable { out << it }
+                    }
+                    out.closeEntry()
+                }
+            }
+        } finally {
+            source.close()
+        }
+    }
+}
+
+// The libraries the game ships itself, as group[:module[:version]] separated by commas. A second copy in the jar would
+// clash with the game's own, so jar-in-jar leaves them out. With a version, compiling and running use the game's copy
+// even where an SDK asks for a newer one: the game pins it, and the game's copy is the one that loads.
+def gameLibs = project.game_libs.split(',').collect { it.trim() }.findAll { it }.collect { it.split(':') }
+
+def moduleNamed = Attribute.of('cogito.moduleNamed', Boolean)
+dependencies {
+    attributesSchema { attribute(moduleNamed) }
+    artifactTypes.getByName('jar') { attributes.attribute(moduleNamed, false) }
+    registerTransform(AddModuleName) {
+        from.attribute(moduleNamed, false).attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, 'jar')
+        to.attribute(moduleNamed, true).attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, 'jar')
+    }
+}
+
+configurations {
+    jarJar.attributes.attribute(moduleNamed, true)
+    runtimeClasspath.extendsFrom localRuntime
+    // The SDK is split across several jars and needs Jackson, OkHttp and Kotlin at runtime.
+    jarJar.transitive = true
+    // Annotations only matter at compile time, and this jar names no module, which jar-in-jar refuses.
+    jarJar.exclude group: 'org.jetbrains', module: 'annotations'
+    jarJar.exclude group: 'com.google.code.findbugs', module: 'jsr305'
+    jarJar.exclude group: 'com.google.auto.value', module: 'auto-value-annotations'
+    gameLibs.each { lib ->
+        def rule = lib.length == 1 ? [group: lib[0]] : [group: lib[0], module: lib[1]]
+        jarJar.exclude rule
+    }
+}
+
+dependencies {
+    // One official SDK per kind of provider: Anthropic, OpenAI (and every server that speaks its API), Google Gemini.
+    def sdks = [
+            "com.anthropic:anthropic-java": anthropic_java_version,
+            "com.openai:openai-java"      : openai_java_version,
+            "com.google.genai:google-genai": google_genai_version,
+    ]
+    sdks.each { module, sdkVersion ->
+        if (testBuiltJar) {
+            compileOnly "${module}:${sdkVersion}"
+        } else {
+            implementation "${module}:${sdkVersion}"
+        }
+        jarJar("${module}:[${sdkVersion},)") {
+            version { prefer sdkVersion }
+        }
+    }
+    // Older loaders keep plain libraries out of a dev run's game unless they are named here (built jars carry them
+    // in jar-in-jar instead). The game's own libraries resolve to the game's versions there too.
+    if (project.findProperty('sdk_dev_classpath') == 'additional' && !testBuiltJar) {
+        sdks.each { module, sdkVersion ->
+            additionalRuntimeClasspath "${module}:${sdkVersion}"
+        }
+    }
+    constraints {
+        gameLibs.findAll { it.length == 3 }.each { lib ->
+            implementation("${lib[0]}:${lib[1]}") { version { strictly lib[2] } }
+            compileOnly("${lib[0]}:${lib[1]}") { version { strictly lib[2] } }
+            additionalRuntimeClasspath("${lib[0]}:${lib[1]}") { version { strictly lib[2] } }
+        }
+    }
+    // A release test finds both jars in its mods folder, as an installed copy does.
+    if (testBuiltJar && !releaseTest) {
+        localRuntime files("build/libs/${mod_id}-${version}.jar")
+    }
+
+    // Baritone is optional at runtime and LGPL-licensed, so it stays a separate mod jar.
+    def baritone = new File(repoDir, "libs/${baritone_jar}")
+    compileOnly files(baritone)
+    if (!releaseTest) {
+        localRuntime files(baritone)
+    }
+}
+
+var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    var replaceProperties = [
+            minecraft_version_range: minecraft_version_range,
+            neo_version_range      : neo_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from new File(repoDir, 'src/main/templates')
+    into 'build/generated/sources/modMetadata'
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// The few classes other mods may compile against (dev.cogito.api), with their sources, as cogito-api-<version>.jar.
+// A mod uses it as compileOnly behind a ModList.isLoaded check; the declaration file alone needs no jar at all.
+tasks.register('apiJar', Jar) {
+    archiveBaseName = "${mod_id}-api"
+    from(sourceSets.main.output) { include 'dev/cogito/api/**' }
+    from(sourceSets.main.allJava) { include 'dev/cogito/api/**' }
+}
+tasks.named('build') { dependsOn 'apiJar' }

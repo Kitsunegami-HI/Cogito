@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -52,8 +53,8 @@ final class Obtain {
     private static final double TAKE_OVERHEAD = 3.0;
     private static final int DEAD_ENDS_SHOWN = 8;
     private static final long MINE_TIMEOUT_SECONDS = 120;
-    private static final Set<Item> JUNK = Set.of(Items.DIRT, Items.GRAVEL, Items.ANDESITE, Items.DIORITE, Items.GRANITE, Items.TUFF,
-            Items.NETHERRACK, Items.ROTTEN_FLESH, Items.LEAF_LITTER, Items.SHORT_GRASS, Items.COARSE_DIRT, Items.WHEAT_SEEDS);
+    private static final Set<Item> JUNK = Bot.itemsPresent("dirt", "gravel", "andesite", "diorite", "granite", "tuff",
+            "netherrack", "rotten_flesh", "leaf_litter", "short_grass", "coarse_dirt", "wheat_seeds");
 
     /** One piece of the tree: something the body can go and do. */
     sealed interface Task permits Mine, Hunt, Craft, Smelt, Take {
@@ -130,11 +131,11 @@ final class Obtain {
 
         Surroundings() {
             var level = Bot.level();
-            dimension = level.dimension().identifier().toString();
+            dimension = Mc.dimension(level);
             BlockPos center = Bot.player().blockPosition();
             BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-            int minY = Math.max(level.getMinY(), center.getY() - SCAN_HEIGHT);
-            int maxY = Math.min(level.getMaxY(), center.getY() + SCAN_HEIGHT);
+            int minY = Math.max(Mc.minY(level), center.getY() - SCAN_HEIGHT);
+            int maxY = Math.min(Mc.maxY(level), center.getY() + SCAN_HEIGHT);
             boolean anyLost = Skills.anyBenchLost();
             for (int x = center.getX() - SCAN_RADIUS; x <= center.getX() + SCAN_RADIUS; x++) {
                 for (int z = center.getZ() - SCAN_RADIUS; z <= center.getZ() + SCAN_RADIUS; z++) {

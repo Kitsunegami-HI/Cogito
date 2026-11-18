@@ -1,5 +1,7 @@
 package dev.cogito.bot;
 
+import dev.cogito.CogitoMod;
+import dev.cogito.compat.Mc;
 import baritone.api.BaritoneAPI;
 import baritone.api.IBaritone;
 import baritone.api.Settings;
@@ -11,6 +13,7 @@ import baritone.api.pathing.goals.GoalXZ;
 import baritone.api.pathing.goals.GoalYLevel;
 import baritone.api.schematic.ISchematic;
 import baritone.api.schematic.IStaticSchematic;
+import baritone.api.utils.BlockOptionalMeta;
 import baritone.api.utils.input.Input;
 import com.google.gson.JsonObject;
 import net.minecraft.core.BlockPos;
@@ -65,7 +68,27 @@ final class BaritoneBridge {
     private static volatile String lastMessage = "";
     private static final Deque<String> recentMessages = new ConcurrentLinkedDeque<>();
 
+    private static volatile boolean dropsReady;
+
     private BaritoneBridge() {}
+
+    /**
+     * Worker thread. To mine, Baritone works out what each block drops from the vanilla data pack, which it loads the
+     * first time it is asked and finishes on the game thread. Asked on the game thread, as starting to mine is, that
+     * waits for itself forever (Baritone 1.11.3 on Minecraft 1.21.1 froze the game this way), so it is loaded here
+     * first, where waiting is safe.
+     */
+    private static void prepareDrops() {
+        if (dropsReady || Bot.mc().isSameThread()) {
+            return;
+        }
+        try {
+            BlockOptionalMeta.ServerLevelStub.fastCreate().registryAccess();
+        } catch (RuntimeException | LinkageError e) {
+            CogitoMod.LOG.warn("Could not load Baritone's block drop data ahead of mining: {}", e.toString());
+        }
+        dropsReady = true;
+    }
 
     private static IBaritone baritone() {
         if (!configured) {
@@ -199,6 +222,7 @@ final class BaritoneBridge {
             }
             baritone().getMineProcess().mine(0, blocks.toArray(new Block[0]));
         };
+        prepareDrops();
         try {
             if (leadAwayFromOwn(blocks, own, timeout)) {
                 Bot.run(startMining);
@@ -346,8 +370,8 @@ final class BaritoneBridge {
         double anyDistance = Double.MAX_VALUE;
         double otherDistance = Double.MAX_VALUE;
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        int minY = Math.max(level.getMinY(), center.getY() - SEARCH_RADIUS);
-        int maxY = Math.min(level.getMaxY(), center.getY() + SEARCH_RADIUS);
+        int minY = Math.max(Mc.minY(level), center.getY() - SEARCH_RADIUS);
+        int maxY = Math.min(Mc.maxY(level), center.getY() + SEARCH_RADIUS);
         for (int x = center.getX() - SEARCH_RADIUS; x <= center.getX() + SEARCH_RADIUS; x++) {
             for (int z = center.getZ() - SEARCH_RADIUS; z <= center.getZ() + SEARCH_RADIUS; z++) {
                 if (!level.hasChunk(x >> 4, z >> 4)) {

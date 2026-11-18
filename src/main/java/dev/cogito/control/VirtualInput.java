@@ -2,13 +2,9 @@ package dev.cogito.control;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
-import dev.cogito.mixin.KeyboardHandlerInvoker;
-import dev.cogito.mixin.MouseHandlerInvoker;
+import dev.cogito.compat.Input;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.util.Mth;
 import org.lwjgl.glfw.GLFW;
@@ -53,10 +49,6 @@ public final class VirtualInput {
         return Minecraft.getInstance();
     }
 
-    private static long handle() {
-        return mc().getWindow().handle();
-    }
-
     private static int modifiers() {
         int mods = 0;
         if (keysDown.contains(GLFW.GLFW_KEY_LEFT_SHIFT) || keysDown.contains(GLFW.GLFW_KEY_RIGHT_SHIFT)) {
@@ -97,8 +89,7 @@ public final class VirtualInput {
     private static void sendKey(int key, int action) {
         Control.setInjecting(true);
         try {
-            ((KeyboardHandlerInvoker) mc().keyboardHandler).cogito$keyPress(handle(), action,
-                    new KeyEvent(key, GLFW.glfwGetKeyScancode(key), modifiers()));
+            Input.keyPress(key, GLFW.glfwGetKeyScancode(key), modifiers(), action);
         } finally {
             Control.setInjecting(false);
         }
@@ -110,7 +101,7 @@ public final class VirtualInput {
         }
         Control.setInjecting(true);
         try {
-            ((KeyboardHandlerInvoker) mc().keyboardHandler).cogito$charTyped(handle(), new CharacterEvent(codepoint));
+            Input.charTyped(codepoint);
         } finally {
             Control.setInjecting(false);
         }
@@ -148,8 +139,7 @@ public final class VirtualInput {
         }
         Control.setInjecting(true);
         try {
-            ((MouseHandlerInvoker) mc().mouseHandler).cogito$onButton(handle(), new MouseButtonInfo(button, modifiers()),
-                    down ? GLFW.GLFW_PRESS : GLFW.GLFW_RELEASE);
+            Input.mouseButton(button, modifiers(), down ? GLFW.GLFW_PRESS : GLFW.GLFW_RELEASE);
         } finally {
             Control.setInjecting(false);
         }
@@ -162,7 +152,7 @@ public final class VirtualInput {
         }
         Control.setInjecting(true);
         try {
-            ((MouseHandlerInvoker) mc().mouseHandler).cogito$onMove(handle(), x, y);
+            Input.mouseMove(x, y);
         } finally {
             Control.setInjecting(false);
         }
@@ -179,7 +169,7 @@ public final class VirtualInput {
         }
         Control.setInjecting(true);
         try {
-            ((MouseHandlerInvoker) mc().mouseHandler).cogito$onScroll(handle(), dx, dy);
+            Input.scroll(dx, dy);
         } finally {
             Control.setInjecting(false);
         }

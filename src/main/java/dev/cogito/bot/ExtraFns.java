@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -11,7 +12,6 @@ import dev.cogito.control.VirtualInput;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.inventory.BookEditScreen;
-import net.minecraft.client.gui.screens.inventory.BookSignScreen;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
@@ -27,7 +27,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.ChatVisiblity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ServerExplosion;
 import net.minecraft.world.level.block.entity.CommandBlockEntity;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
@@ -92,7 +91,7 @@ final class ExtraFns {
             WindowFns.pressWidget(CommonComponents.GUI_DONE);
         } else {
             WindowFns.pressWidget(Component.translatable("book.signButton"));
-            if (!Bot.waitUntil(() -> Bot.mc().screen instanceof BookSignScreen, 1500)) {
+            if (!Bot.waitUntil(() -> Mc.bookSigning(Bot.mc().screen), 1500)) {
                 throw new ApiError("no_window", "the signing page did not open");
             }
             ScreenTool.type(title);
@@ -139,8 +138,8 @@ final class ExtraFns {
             String last = text.substring(text.lastIndexOf(' ') + 1).toLowerCase(Locale.ROOT);
             Bot.call(() -> {
                 for (PlayerInfo info : Bot.player().connection.getOnlinePlayers()) {
-                    if (info.getProfile().name().toLowerCase(Locale.ROOT).startsWith(last)) {
-                        out.add(info.getProfile().name());
+                    if (Mc.profileName(info.getProfile()).toLowerCase(Locale.ROOT).startsWith(last)) {
+                        out.add(Mc.profileName(info.getProfile()));
                     }
                 }
                 return null;
@@ -293,7 +292,7 @@ final class ExtraFns {
             if (distance > 1.0) {
                 return J.obj("damage", 0, "note", "out of range of the blast");
             }
-            float seen = ServerExplosion.getSeenPercent(center, entity);
+            float seen = Mc.seenPercent(center, entity);
             double strength = (1.0 - distance) * seen;
             float damage = (float) ((strength * strength + strength) / 2.0 * 7.0 * reach + 1.0);
             boolean raw = J.bool(args, "raw", false);

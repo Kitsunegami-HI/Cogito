@@ -1,5 +1,6 @@
 package dev.cogito.usage;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -15,7 +16,6 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
@@ -90,7 +90,7 @@ public final class UsageRegistry {
 
     static {
         registerHandler("minecraft:clock", "read", args -> Bot.call(() -> {
-            long time = Bot.level().getOverworldClockTime() % 24000;
+            long time = Mc.dayTime(Bot.level()) % 24000;
             return J.obj("tick_of_day", time, "phase", time < 12000 ? "day" : time < 13000 ? "dusk" : time < 23000 ? "night" : "dawn");
         }));
     }
@@ -105,7 +105,7 @@ public final class UsageRegistry {
 
     private static Map<String, Declaration> load() {
         Map<String, Declaration> out = new LinkedHashMap<>();
-        Map<Identifier, Resource> found = Minecraft.getInstance().getResourceManager()
+        var found = Minecraft.getInstance().getResourceManager()
                 .listResources("ai_usage", id -> id.getPath().endsWith(".md"));
         found.forEach((id, resource) -> {
             try (BufferedReader reader = resource.openAsReader()) {
@@ -261,7 +261,7 @@ public final class UsageRegistry {
         Map<Block, String> wanted = new LinkedHashMap<>();
         for (String target : declaration.targets()) {
             if (target.startsWith("block:")) {
-                Identifier id = Identifier.tryParse(target.substring("block:".length()));
+                var id = Mc.tryId(target.substring("block:".length()));
                 if (id != null) {
                     BuiltInRegistries.BLOCK.getOptional(id).ifPresent(block -> wanted.put(block, id.toString()));
                 }
@@ -372,7 +372,7 @@ public final class UsageRegistry {
         if (colon < 0) {
             return null;
         }
-        Identifier id = Identifier.tryParse(target.substring(colon + 1));
+        var id = Mc.tryId(target.substring(colon + 1));
         if (id == null) {
             return null;
         }

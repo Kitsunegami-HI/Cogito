@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -7,7 +8,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.BrewingStandMenu;
@@ -66,8 +66,7 @@ final class Brewing {
     // ---- naming ----
 
     static Holder<Potion> potion(String raw) {
-        Identifier id = Bot.id(raw);
-        return BuiltInRegistries.POTION.get(id).map(holder -> (Holder<Potion>) holder)
+        return Mc.holder(BuiltInRegistries.POTION, raw).map(holder -> (Holder<Potion>) holder)
                 .orElseThrow(() -> new ApiError("bad_argument", "no potion named " + raw, "potions() lists the ids; long_ and strong_ kinds are separate"));
     }
 
@@ -83,8 +82,8 @@ final class Brewing {
     private static JsonObject potionsJson(String query) {
         JsonArray out = new JsonArray();
         String needle = query.toLowerCase(Locale.ROOT);
-        BuiltInRegistries.POTION.listElements().forEach(holder -> {
-            String id = holder.key().identifier().toString();
+        Mc.holders(BuiltInRegistries.POTION).forEach(holder -> {
+            String id = Mc.key(holder.key());
             String name = PotionContents.createItemStack(Items.POTION, holder).getHoverName().getString();
             if (needle.isEmpty() || id.contains(needle) || name.toLowerCase(Locale.ROOT).contains(needle)) {
                 out.add(J.obj("id", id, "name", name));

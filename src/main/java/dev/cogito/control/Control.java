@@ -1,6 +1,7 @@
 package dev.cogito.control;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.cogito.compat.Input;
 import dev.cogito.CogitoMod;
 import dev.cogito.Config;
 import dev.cogito.agent.AgentLoop;
@@ -9,7 +10,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
-import net.minecraft.client.input.KeyEvent;
 
 /**
  * Who owns the client right now. The person always wins: pressing the takeover key locks the AI out
@@ -52,7 +52,7 @@ public final class Control {
     }
 
     /** Handles the takeover key. Returns true when the event was consumed. */
-    public static boolean onRealKey(int action, KeyEvent event) {
+    public static boolean onRealKey(int action, int key) {
         if (injecting || action != 1 || CogitoMod.TAKEOVER_KEY == null) {
             return false;
         }
@@ -61,7 +61,7 @@ public final class Control {
             return false;
         }
         InputConstants.Key bound = CogitoMod.TAKEOVER_KEY.getKey();
-        if (bound.getType() != InputConstants.Type.KEYSYM || bound.getValue() != event.key()) {
+        if (bound.getType() != InputConstants.Type.KEYSYM || bound.getValue() != key) {
             return false;
         }
         if (ai) {
@@ -86,7 +86,7 @@ public final class Control {
         Minecraft mc = Minecraft.getInstance();
         // Release the OS cursor while the mixin still lets the call through.
         if (mc.mouseHandler.isMouseGrabbed()) {
-            InputConstants.grabOrReleaseMouse(mc.getWindow(), GLFW_CURSOR_NORMAL,
+            Input.grabOrReleaseMouse(GLFW_CURSOR_NORMAL,
                     mc.getWindow().getScreenWidth() / 2.0, mc.getWindow().getScreenHeight() / 2.0);
         }
         KeyMapping.releaseAll();
@@ -112,7 +112,7 @@ public final class Control {
         Minecraft mc = Minecraft.getInstance();
         AgentLoop.get().onHumanTookOver();
         if (mc.mouseHandler.isMouseGrabbed()) {
-            InputConstants.grabOrReleaseMouse(mc.getWindow(), GLFW_CURSOR_DISABLED,
+            Input.grabOrReleaseMouse(GLFW_CURSOR_DISABLED,
                     mc.getWindow().getScreenWidth() / 2.0, mc.getWindow().getScreenHeight() / 2.0);
             mc.mouseHandler.setIgnoreFirstMove();
         }

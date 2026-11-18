@@ -1,5 +1,6 @@
 package dev.cogito.agent;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -89,7 +90,7 @@ public final class Verifier {
                 return id.equals(c[4].contains(":") ? c[4] : "minecraft:" + c[4]) ? null : "it is " + id;
             }
             case "dimension" -> {
-                String id = Bot.level().dimension().identifier().toString();
+                String id = Mc.dimension(Bot.level());
                 return id.equals(c[1]) ? null : "in " + id;
             }
             case "y_below" -> {

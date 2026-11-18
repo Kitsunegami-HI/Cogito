@@ -1,5 +1,6 @@
 package dev.cogito.memory;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -128,7 +129,7 @@ public final class WorldFacts {
 
     /** Going through a portal is worth remembering in both directions; being respawned elsewhere is not. */
     private static void noteDimensionChange(LocalPlayer player) {
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = Mc.dimension(player.level());
         if (lastDimension != null && !dimension.equals(lastDimension) && ticksSinceDeath >= AFTER_DEATH_TICKS) {
             String shortFrom = lastDimension.substring(lastDimension.indexOf(':') + 1);
             String shortTo = dimension.substring(dimension.indexOf(':') + 1);
@@ -145,10 +146,10 @@ public final class WorldFacts {
         ClientPacketListener connection = player.connection;
         String now = Instant.now().toString();
         for (PlayerInfo info : connection.getOnlinePlayers()) {
-            if (info.getProfile().id().equals(player.getUUID())) {
+            if (Mc.profileId(info.getProfile()).equals(player.getUUID())) {
                 continue;
             }
-            JsonObject row = person(info.getProfile().name(), now);
+            JsonObject row = person(Mc.profileName(info.getProfile()), now);
             row.addProperty("last_online", now);
             peopleChanged = true;
         }
@@ -157,7 +158,7 @@ public final class WorldFacts {
                 JsonObject row = person(other.getName().getString(), now);
                 row.addProperty("last_seen_nearby", now);
                 row.add("last_pos", J.nums(other.getBlockX(), other.getBlockY(), other.getBlockZ()));
-                row.addProperty("last_dimension", other.level().dimension().identifier().toString());
+                row.addProperty("last_dimension", Mc.dimension(other.level()));
                 peopleChanged = true;
             }
         }
@@ -181,7 +182,7 @@ public final class WorldFacts {
         }
         PlayerInfo info = mc.getConnection().getPlayerInfo(sender);
         if (info != null) {
-            JsonObject row = person(info.getProfile().name(), Instant.now().toString());
+            JsonObject row = person(Mc.profileName(info.getProfile()), Instant.now().toString());
             row.addProperty("last_said", text.length() > MAX_SAID ? text.substring(0, MAX_SAID) + "…" : text);
             peopleChanged = true;
         }
@@ -191,9 +192,9 @@ public final class WorldFacts {
 
     private static JsonObject snapshot(Minecraft mc, LocalPlayer player) {
         JsonObject out = J.obj("updated", Instant.now().toString(),
-                "dimension", player.level().dimension().identifier().toString(),
+                "dimension", Mc.dimension(player.level()),
                 "pos", J.nums(player.getBlockX(), player.getBlockY(), player.getBlockZ()),
-                "day", mc.level.getOverworldClockTime() / 24000L,
+                "day", Mc.dayTime(mc.level) / 24000L,
                 "health", Math.round(player.getHealth()), "food", player.getFoodData().getFoodLevel());
         Map<AdvancementHolder, AdvancementProgress> progress = ((ClientAdvancementsAccessor) player.connection.getAdvancements()).cogito$progress();
         JsonArray done = new JsonArray();

@@ -1,5 +1,6 @@
 package dev.cogito.memory;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -139,7 +140,7 @@ public final class MemoryStore {
     private static JsonElement place(JsonObject args) {
         String name = J.str(args, "name");
         BlockPos pos = Bot.pos(args);
-        String dimension = Bot.call(() -> Bot.level().dimension().identifier().toString());
+        String dimension = Bot.call(() -> Mc.dimension(Bot.level()));
         WorldFacts.notePlace(name, pos, dimension, J.str(args, "note", ""));
         return J.obj("saved", name);
     }

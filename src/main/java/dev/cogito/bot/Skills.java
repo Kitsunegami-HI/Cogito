@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import dev.cogito.memory.MemoryStore;
 import com.google.gson.JsonElement;
@@ -29,7 +30,6 @@ import net.minecraft.world.inventory.AbstractFurnaceMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.equipment.Equippable;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -232,7 +232,7 @@ final class Skills {
                     if (!level.hasChunk(x >> 4, z >> 4)) {
                         continue;
                     }
-                    for (int y = Math.max(level.getMinY(), center.getY() - height); y <= Math.min(level.getMaxY(), center.getY() + height); y++) {
+                    for (int y = Math.max(Mc.minY(level), center.getY() - height); y <= Math.min(Mc.maxY(level), center.getY() + height); y++) {
                         cursor.set(x, y, z);
                         if (wanted.test(level.getBlockState(cursor)) && !leaveOut.test(cursor)) {
                             double distance = cursor.distSqr(center);
@@ -1173,7 +1173,6 @@ final class Skills {
         record Choice(String id, int burn, int have) {}
         int ticksNeeded = count * 200;
         Choice choice = Bot.call(() -> {
-            var fuels = Bot.level().fuelValues();
             Inventory inventory = Bot.player().getInventory();
             Item chosen = fuelChoice == null ? null : Bot.item(fuelChoice);
             Item best = null;
@@ -1181,7 +1180,7 @@ final class Skills {
             int total = 0;
             for (int i = 0; i < 36; i++) {
                 ItemStack stack = inventory.getItem(i);
-                int burn = fuels.burnDuration(stack);
+                int burn = Mc.burnTicks(stack);
                 boolean allowed = burn > 0 && stack.getItem() != input && !stack.isDamageableItem()
                         && (chosen != null ? stack.getItem() == chosen
                         : stack.is(ItemTags.COALS) || stack.is(ItemTags.LOGS_THAT_BURN) || stack.is(ItemTags.PLANKS) || stack.is(Items.STICK));
@@ -1200,7 +1199,7 @@ final class Skills {
             return best == null ? null : new Choice(idOf(best), bestBurn, total);
         });
         ItemStack inSlot = furnaceSlot(AbstractFurnaceMenu.FUEL_SLOT);
-        int burnsAlready = Bot.call(() -> Bot.level().fuelValues().burnDuration(inSlot) * inSlot.getCount());
+        int burnsAlready = Bot.call(() -> Mc.burnTicks(inSlot) * inSlot.getCount());
         if (burnsAlready >= ticksNeeded) {
             return;
         }
@@ -1221,7 +1220,7 @@ final class Skills {
     // ---- fighting and food ----
 
     private static EntityType<?> entityType(String raw) {
-        return BuiltInRegistries.ENTITY_TYPE.getOptional(Bot.id(raw))
+        return BuiltInRegistries.ENTITY_TYPE.getOptional(Mc.id(raw))
                 .orElseThrow(() -> new ApiError("bad_argument", "no entity type named '" + raw + "'"));
     }
 
@@ -1360,7 +1359,7 @@ final class Skills {
     private static void equipBestWeapon() {
         String best = Bot.call(() -> {
             Inventory inventory = Bot.player().getInventory();
-            double top = attackDamage(inventory.getItem(inventory.getSelectedSlot()));
+            double top = attackDamage(inventory.getItem(Mc.selectedSlot(inventory)));
             String found = null;
             for (int i = 0; i < 36; i++) {
                 double damage = attackDamage(inventory.getItem(i));
@@ -1568,7 +1567,7 @@ final class Skills {
         if (!awake) {
             call("wake", new JsonObject());
         }
-        return J.obj("slept_through", awake, "time", Bot.call(() -> Bot.level().getOverworldClockTime() % 24000));
+        return J.obj("slept_through", awake, "time", Bot.call(() -> Mc.dayTime(Bot.level()) % 24000));
     }
 
     // ---- chests ----
@@ -1640,7 +1639,7 @@ final class Skills {
         if (place == null) {
             throw new ApiError("not_found", "no place named " + name + " is remembered in this world", "memory op worlds lists the places; op place remembers one");
         }
-        String here = Bot.call(() -> Bot.level().dimension().identifier().toString());
+        String here = Bot.call(() -> Mc.dimension(Bot.level()));
         if (!J.str(place, "dimension", here).equals(here)) {
             throw new ApiError("wrong_dimension", name + " is in " + J.str(place, "dimension", "") + ", and you are in " + here, "find the way there first");
         }
@@ -1683,8 +1682,8 @@ final class Skills {
                 String found = null;
                 for (int i = 0; i < 36; i++) {
                     ItemStack stack = inventory.getItem(i);
-                    Equippable equippable = stack.get(DataComponents.EQUIPPABLE);
-                    if (equippable != null && equippable.slot() == entry.getValue() && armorValue(stack, entry.getValue()) > top) {
+                    EquipmentSlot slot = Mc.equipSlot(stack);
+                    if (slot == entry.getValue() && armorValue(stack, entry.getValue()) > top) {
                         top = armorValue(stack, entry.getValue());
                         found = Bot.itemId(stack);
                     }

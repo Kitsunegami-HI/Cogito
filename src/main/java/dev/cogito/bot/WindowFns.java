@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -21,21 +22,15 @@ import net.minecraft.tags.ItemTags;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ContainerInput;
+import dev.cogito.compat.Click;
+import dev.cogito.compat.RecipeView;
+import dev.cogito.compat.Recipes;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.display.RecipeDisplay;
-import net.minecraft.world.item.crafting.display.RecipeDisplayEntry;
-import net.minecraft.world.item.crafting.display.ShapedCraftingRecipeDisplay;
-import net.minecraft.world.item.crafting.display.ShapelessCraftingRecipeDisplay;
-import net.minecraft.world.item.crafting.display.SlotDisplay;
-import net.minecraft.world.item.crafting.display.SlotDisplayContext;
 import net.minecraft.world.item.trading.MerchantOffer;
-import net.minecraft.util.context.ContextMap;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import org.lwjgl.glfw.GLFW;
@@ -213,7 +208,7 @@ final class WindowFns {
         if (reachable) {
             pressHere(button, shift);
         } else {
-            slotInput(slotIndex, button, shift ? ContainerInput.QUICK_MOVE : ContainerInput.PICKUP);
+            slotInput(slotIndex, button, shift ? Click.QUICK_MOVE : Click.PICKUP);
         }
     }
 
@@ -235,10 +230,10 @@ final class WindowFns {
      * can leave a wrong position on a slot while drawing it elsewhere, and in a minimized window nothing has a position.
      * This goes to the game's own slot handling, which is where a click on that slot would have ended up.
      */
-    private static void slotInput(int slotIndex, int button, ContainerInput input) {
+    private static void slotInput(int slotIndex, int button, Click input) {
         Bot.run(() -> {
             LocalPlayer player = Bot.player();
-            Bot.mc().gameMode.handleContainerInput(containerScreen().getMenu().containerId, slotIndex, button, input, player);
+            Mc.click(containerScreen().getMenu().containerId, slotIndex, button, input, player);
         });
         Bot.pause(90);
     }
@@ -273,7 +268,7 @@ final class WindowFns {
                     throw new ApiError("bad_argument", "for mode 2, button is the hotbar slot 0-8");
                 }
                 if (!moveCursorOnly(slot)) {
-                    slotInput(slot, button, ContainerInput.SWAP);
+                    slotInput(slot, button, Click.SWAP);
                     return;
                 }
                 Bot.run(() -> VirtualInput.tapMapping(ActionFns.options().keyHotbarSlots[button]));
@@ -281,7 +276,7 @@ final class WindowFns {
             }
             case 4 -> {
                 if (!moveCursorOnly(slot)) {
-                    slotInput(slot, 0, ContainerInput.THROW);
+                    slotInput(slot, 0, Click.THROW);
                     return;
                 }
                 Bot.run(() -> VirtualInput.tapMapping(ActionFns.options().keyDrop));
@@ -472,7 +467,7 @@ final class WindowFns {
         Bot.requireControl();
         int found = Bot.call(() -> {
             Inventory inv = Bot.player().getInventory();
-            if (Bot.matchesItem(inv.getItem(inv.getSelectedSlot()), item)) {
+            if (Bot.matchesItem(inv.getItem(Mc.selectedSlot(inv)), item)) {
                 return -2;
             }
             for (int i = 0; i < 36; i++) {
@@ -578,11 +573,11 @@ final class WindowFns {
             int here = Bot.call(() -> containerScreen().getMenu().slots.get(slot).getItem().getCount());
             moveCursorOnly(slot);
             if (amount < 0 || amount - thrown >= here) {
-                slotInput(slot, 1, ContainerInput.THROW);
+                slotInput(slot, 1, Click.THROW);
                 thrown += here;
             } else {
                 for (int i = thrown; i < amount; i++) {
-                    slotInput(slot, 0, ContainerInput.THROW);
+                    slotInput(slot, 0, Click.THROW);
                 }
                 thrown = amount;
             }
@@ -662,7 +657,7 @@ final class WindowFns {
             });
             if (best != HOTBAR_START + place) {
                 moveCursorOnly(best);
-                slotInput(best, place, ContainerInput.SWAP);
+                slotInput(best, place, Click.SWAP);
                 moved++;
             }
         }
@@ -763,8 +758,8 @@ final class WindowFns {
     static void equipBestTool(BlockState state) {
         int best = Bot.call(() -> {
             Inventory inv = Bot.player().getInventory();
-            float bestSpeed = inv.getItem(inv.getSelectedSlot()).getDestroySpeed(state);
-            boolean harvests = inv.getItem(inv.getSelectedSlot()).isCorrectToolForDrops(state);
+            float bestSpeed = inv.getItem(Mc.selectedSlot(inv)).getDestroySpeed(state);
+            boolean harvests = inv.getItem(Mc.selectedSlot(inv)).isCorrectToolForDrops(state);
             int found = -1;
             for (int i = 0; i < 36; i++) {
                 ItemStack stack = inv.getItem(i);
@@ -791,42 +786,8 @@ final class WindowFns {
     /** A grid cell holds a stack at most. */
     private static final int MAX_PER_CELL = 64;
 
-    private static List<RecipeDisplay> allDisplays() {
-        List<RecipeDisplay> out = new ArrayList<>();
-        var server = Bot.mc().getSingleplayerServer();
-        if (server != null) {
-            for (RecipeHolder<?> holder : server.getRecipeManager().getRecipes()) {
-                out.addAll(holder.value().display());
-            }
-        } else {
-            // On a server the client only holds the recipes the player has unlocked.
-            Bot.player().getRecipeBook().getCollections().forEach(collection -> {
-                for (RecipeDisplayEntry entry : collection.getRecipes()) {
-                    out.add(entry.display());
-                }
-            });
-        }
-        return out;
-    }
-
-    static CraftPlan toPlan(RecipeDisplay display, ContextMap context) {
-        ItemStack result = display.result().resolveForFirstStack(context);
-        if (display instanceof ShapedCraftingRecipeDisplay shaped) {
-            List<List<ItemStack>> cells = new ArrayList<>();
-            for (SlotDisplay ingredient : shaped.ingredients()) {
-                cells.add(ingredient.resolveForStacks(context));
-            }
-            return new CraftPlan(shaped.width(), shaped.height(), cells, result.getCount(), true);
-        }
-        if (display instanceof ShapelessCraftingRecipeDisplay shapeless) {
-            List<List<ItemStack>> cells = new ArrayList<>();
-            for (SlotDisplay ingredient : shapeless.ingredients()) {
-                cells.add(ingredient.resolveForStacks(context));
-            }
-            int side = cells.size() <= 4 ? 2 : 3;
-            return new CraftPlan(side, (cells.size() + side - 1) / side, cells, result.getCount(), false);
-        }
-        return null;
+    static CraftPlan toPlan(RecipeView.Crafting recipe) {
+        return new CraftPlan(recipe.width(), recipe.height(), recipe.cells(), recipe.result().getCount(), recipe.shaped());
     }
 
     static List<CraftPlan> plansFor(Item item) {
@@ -888,16 +849,15 @@ final class WindowFns {
     }
 
     private static JsonObject recipesAll(int limit) {
-        ContextMap context = SlotDisplayContext.fromLevel(Bot.level());
         JsonArray out = new JsonArray();
-        for (RecipeDisplay display : allDisplays()) {
+        for (RecipeView.Crafting recipe : Recipes.listed()) {
             if (out.size() >= limit) {
                 break;
             }
-            CraftPlan plan = toPlan(display, context);
-            if (plan != null && missing(plan).isEmpty()) {
+            CraftPlan plan = toPlan(recipe);
+            if (missing(plan).isEmpty()) {
                 JsonObject row = planJson(plan);
-                row.addProperty("item", Bot.itemId(display.result().resolveForFirstStack(context)));
+                row.addProperty("item", Bot.itemId(recipe.result()));
                 out.add(row);
             }
         }

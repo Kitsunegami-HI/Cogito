@@ -1,0 +1,7 @@
+// Cogito for Minecraft 1.21.1 (NeoForge). Build from the repository root with: gradlew -p versions/1.21.1 build
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+apply from: '../../gradle/cogito.gradle'

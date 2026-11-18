@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -213,7 +214,7 @@ final class Blueprint {
 
     static BlockState parseBlock(String text) {
         try {
-            return BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK, text.trim(), false).blockState();
+            return BlockStateParser.parseForBlock(Mc.blockLookup(), text.trim(), false).blockState();
         } catch (CommandSyntaxException e) {
             throw new ApiError("bad_block", "'" + text.trim() + "' is not a block: " + e.getMessage(), "write an id with its state if needed, such as minecraft:oak_stairs[facing=east]");
         }

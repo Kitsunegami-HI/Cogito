@@ -1,8 +1,8 @@
 # Cogito（原型）
 
-*An AI that plays Minecraft through a real client: plans, skills, reflexes and vision, with the person able to take back control at any time. NeoForge 26.1.2, client only.*
+*An AI that plays Minecraft through a real client: plans, skills, reflexes and vision, with the person able to take back control at any time. NeoForge 26.1.2 and 1.21.1, client only.*
 
-把一个真实的 Minecraft 客户端交给 AI 操作。适用于 NeoForge 26.1.2，只需装在客户端。
+把一个真实的 Minecraft 客户端交给 AI 操作。适用于 NeoForge 26.1.2 和 NeoForge 1.21.1，只需装在客户端。
 
 名字取自“我思故我在”（cogito, ergo sum），和编程法术的 [Logos](https://github.com/MagicFoxDemon/MinecraftLogosMod) 是一对：Logos 是写成法术的言语，Cogito 是会思考、会动手的玩家。0.2.0 及以前叫 AI Player，见[改名](#改名)。
 
@@ -21,8 +21,8 @@
 
 ## 安装
 
-1. 构建 `cogito-0.2.0.jar`，放进 `mods`。jar 约 116MB，几乎全是三家的 SDK：OpenAI 的约 75MB，Anthropic 的约 39MB，Gemini 的连同 Google 的依赖约 12MB。
-2. 可选但推荐：把 `libs/baritone-api-neoforge-1.18.0.jar` 也放进 `mods`。没有它时 `goto` 只能直线走，`collectBlock` 不可用。
+1. 构建对应版本的 jar 放进 `mods`：26.1.2 是 `build/libs/cogito-0.3.0.jar`，1.21.1 是 `versions/1.21.1/build/libs/cogito-0.3.0+mc1.21.1.jar`。jar 约 116MB，几乎全是三家的 SDK：OpenAI 的约 75MB，Anthropic 的约 39MB，Gemini 的连同 Google 的依赖约 12MB。
+2. 可选但推荐：把对应版本的 Baritone 也放进 `mods`：26.1.2 用 `libs/baritone-api-neoforge-1.18.0.jar`，1.21.1 用 `libs/baritone-api-neoforge-1.11.3.jar`。没有它时 `goto` 只能直线走，`collectBlock` 不可用。
 3. 在游戏里按 F9（或者模组列表里 Cogito 的“配置”按钮）打开模型设置，选提供商、填密钥。见下面的[模型提供商](#模型提供商)。
 
 ```bash
@@ -46,6 +46,24 @@
 ```
 
 发行时只需要本体 jar 和 Baritone jar。`cogito-api` jar 是给其他 mod 编译用的，玩家不需要。
+
+### 多个 Minecraft 版本
+
+仓库根目录构建 26.1.2，`versions/1.21.1/` 构建 1.21.1。两边共用 `gradle/cogito.gradle`，上面的命令都能用，只是要加 `-p versions/1.21.1`：
+
+```bash
+./gradlew -p versions/1.21.1 build
+```
+
+```bash
+./gradlew -p versions/1.21.1 runClient "-PquickPlay=AI Test 1_21_1"
+```
+
+`-PquickPlay=<存档>` 让开发运行直接进那个存档，两个版本都能用。1.21.1 的开发运行目录是 `versions/1.21.1/run`，MCP 端口设成 25602（26.1.2 的是 25601，真正实例的是默认的 25599）。
+
+代码的分法：两个版本都能原样编译的代码放在 `src/main`。两个版本写法不同的部分，放在 `versions/<版本>/src/main` 里，类名相同，大多在 `dev.cogito.compat` 下：`Mc`（id、维度、时间、选中格、高度、标签、燃料、穿戴、槽位点击、NBT、按键绑定）、`Input`（键鼠事件）、`Recipes`（配方从哪来）、`Frames`（截图）、`Canvas`（界面提示）、`Widgets`（设置界面的按钮和滚动）。输入相关的 mixin，以及 `MinecraftMixin` 和 `ClientPacketListenerMixin`，也是每个版本各一份。共用代码只调用这些类，所以加一个版本主要是写一份新的 `versions/<版本>/`。
+
+每个版本的 `gradle.properties` 写着它和别的版本不一样的地方：Minecraft、NeoForge、Java 版本，对应的 Baritone，以及游戏自带的库（`game_libs`）。这些库不打进 jar，编译和运行都用游戏的版本。1.21.1 自带的 Guava、Gson、httpclient 比 SDK 要的旧，SDK 在这些旧版本上实测能用。数据集模块只接在 26.1.2 上。
 
 测试多人路径时，先让第一个客户端开放局域网（`/publish true survival 25565`），再运行第二个客户端。它用 `run2` 目录和玩家名 `Bot2`，`run2/cogito/config.json` 里要把 `mcpPort` 改成别的端口：
 
@@ -177,6 +195,7 @@ claude mcp add --transport http minecraft http://127.0.0.1:25599/mcp --header "A
 | `../cogito-dataset`（仓库之外） | 可选的数据集模块。放在项目旁边时，构建会把它当成第二个 mod 加载；没有它，构建和运行都不受影响 |
 | `llm/` | 模型调用：三类提供商共用的对话接口（`Chat`、`Conversation`），各自的实现，设置和密钥（`LlmSettings`），用量和费用（`Llm`） |
 | `mcp/`、`ui/` | MCP 服务；屏幕提示和模型设置界面 |
+| `compat/`、`versions/<版本>/` | 各个 Minecraft 版本写法不同的部分，见[多个 Minecraft 版本](#多个-minecraft-版本) |
 
 ## 技能
 
@@ -416,7 +435,7 @@ usage <声明 id> <只读动作> [参数 JSON]
 
 ## 接口覆盖
 
-除特别说明外，全部在真实客户端里跑过，NeoForge 26.1.2.112。
+除特别说明外，全部在真实客户端里跑过，NeoForge 26.1.2.112。1.21.1（NeoForge 21.1.267）只跑过下面“测试过的端到端场景”里写明的部分。
 
 | 分类 | 函数 |
 | --- | --- |
@@ -453,7 +472,7 @@ usage <声明 id> <只读动作> [参数 JSON]
 - **没有声明的 mod 方块还没解决**：写了声明的 Logos 已经能靠一句话用起来。机械动力石磨没有声明，测试没通过，见下表。这些测试是在视觉接入之前做的，之后按你的决定暂停了，没有重测，所以不知道现在能不能过。
 - **Logos 接口的边角**：术式放没放出去只能看效果，校验条件查不到；`range` 是估算，书灵写的慢速弹丸在 17 格外就散了，模型是打空之后才走近的；书灵的请求走它自己的接口，不计入这里的费用统计；只在单人世界测过，服务器上的书灵路径（服务器提供书灵时）没测。
 - **多人只测过局域网**：用两个开发客户端测的，关了正版验证。没测过真正的专用服务器、正版验证、反作弊和整合包服务器。
-- **多人服务器的配方**：服务器不把未解锁的配方和机器配方发给客户端。原版配方从游戏 jar 里读，所以不受影响；服务器改过的配方和 mod 配方在解锁前不可见，`machine_recipes` 为空，只能靠 JEI、mod 文本或看界面。
+- **多人服务器的配方（只限 26.1.2）**：服务器不把未解锁的配方和机器配方发给客户端。原版配方从游戏 jar 里读，所以不受影响；服务器改过的配方和 mod 配方在解锁前不可见，`machine_recipes` 为空，只能靠 JEI、mod 文本或看界面。
 - **只在开发环境里装过**：0.2.0 发行版在全新的游戏目录里测过（只从 `mods` 加载），但这个目录还是由开发环境启动的，没有在启动器的正式实例里跑过。
 - **窗口最小化时**：窗口尺寸变成 0，光标没有地方可去。画面还能截到；物品窗口的函数改走游戏的槽位入口，照常工作；屏幕工具的点击会返回 `window_minimized`，不再悄悄点空。自绘界面（比如 Logos 的编辑器）在最小化时只能等。
 - **深水里寻路**：Baritone 找不到水下方块的路径，模型只能自己想办法。出生在海上时一个简单目标 150 秒也没做完。
@@ -461,12 +480,16 @@ usage <声明 id> <只读动作> [参数 JSON]
 - **费用是估算**：按返回的用量和价格算，用于花费上限，不等于账单。Claude 以外的模型没填价格时故意估高，比如经 OpenAI 兼容接口跑 Haiku 时估成了实际的 20 多倍。
 - **Gemini 只测过一个模型和两个短目标**：`gemini-3.8-flash`，见下表。更长的目标、Gemini 2.x（走思考预算而不是思考等级）、Vertex AI 都没测。
 - **OpenAI 兼容只测过一个服务器**：用的是 Anthropic 的 OpenAI 兼容接口。它不支持列模型（要 Anthropic 的请求头），也没有提示缓存。OpenAI 本身、Ollama、其他厂商的兼容接口都没测。思考内容只认 `reasoning_content` 和 `reasoning` 两个字段。
+- **1.21.1 测得比 26.1.2 少**：跑过的见下表。多人、蓝图建造、酿造、箱子、Logos、OpenAI 兼容和 Gemini、F8 接管和 F9 设置界面都还没在 1.21.1 上测过。1.21.1 没有能放布局的滚动区域，设置界面在这个版本上改成滚轮挪动内容、放不下的行藏起来，也没测过。1.21.1 上服务器会把全部配方发给客户端，所以这个版本在服务器上也能读到 mod 配方和机器配方。
 - **换提供商时模型名不跟着换**：在界面里把某一层换到别的提供商，或者删掉它正在用的提供商时，模型框里还是原来的名字，要自己改。“测试连接”会报出来。
 
 ## 测试过的端到端场景
 
 | 场景 | 结果 | 约花费 |
 | --- | --- | --- |
+| 1.21.1 开发运行，新建的森林世界（简单），全程通过 MCP | 第一次让 Baritone 挖东西时游戏卡死不动：它要先读原版数据包算方块掉落，读完的最后一步排在游戏线程上，可它正是在游戏线程上等这一步。现在挖之前先在工作线程里把这份数据读好（两个版本都这样做）。之后：屏幕工具点过引导页、标题页和建世界页，打字、Esc 都送到了，截图颜色正常，提示条和 AI 光标画出来了。不用模型的 `obtain`：空手到木镐 43 秒，接着石镐 40 秒、两块木炭 76 秒（建熔炉、做木斧、放燃料、取出）；`recipesFor` 读出合成和熔炼配方，`potions`、`findBlocks`、`status`（群系、时间）正常。Haiku 目标“做个箱子放在旁边，把石镐放进去”：一次规划、三步完成 | $0.0037 |
+| 1.21.1 发行版（`-PreleaseTest`）：全新游戏目录，`mods` 里只有本体和 Baritone 1.11.3，密钥只来自启动进程的环境变量 | 42 个库都从 jar 里加载。目标“打招呼，再说站在什么群系”：规划层看着画面说了“snowy spruce hills”，聊天里发了 Hello 和 grove | $0.0029 |
+| 改成多版本之后的 26.1.2 开发运行（`AI Test A`） | 配方、空手到木镐 57 秒、截图和提示条都正常；打包的库和改之前一样 | $0 |
 | 三类提供商：每类跑同样两个目标，一个只用执行层（给定一步：读位置、发聊天、`finish_step`），一个只用规划层（“打个招呼再说背包还剩几格”） | Anthropic（Haiku 5.5，密钥来自环境变量）：两个都完成，思考、工具、结构化计划正常，执行层每轮约 1.07 万 token 读自缓存，$0.0056。OpenAI 兼容（Anthropic 的兼容接口，同一个 Haiku）：两个都完成，没有参数被拒，没有缓存。Gemini（本地模仿服务器）：两个都完成；核对了请求：密钥走请求头，工具都带 JSON schema，画面作为 PNG 内嵌，模型那一轮连同思考摘要和思考签名原样传回，函数结果放在 `output` 下，规划层带 `application/json` 和计划的 schema | $0.006 / 实际约 $0.006（估算 $0.14）/ $0 |
 | 真实 Gemini：真人在设置界面填了密钥，两层都用 `gemini-3.8-flash`，跑上面同样两个目标 | 两个都完成，没有参数被拒。执行层第二轮有 6893 token 读自 Gemini 的隐式缓存；同一轮里函数结果后面跟画面，接口接受；规划层同时带工具和结构化输出，直接给出 JSON 计划，并返回了思考摘要（执行层低强度时没有） | 估算 $0.088（没填价格，按偏高价估） |
 | 模型设置界面，全程用真实的窗口消息操作 | 切换编辑对象、给两层换提供商、填接口地址和密钥环境变量，密钥那一行随输入更新来源；“测试连接”：Anthropic 列出 14 个模型，OpenAI 兼容的模型回了 OK（列模型被那个接口拒绝，界面照实显示），Gemini 列出 1 个能生成的模型并回了 OK。保存后的文件里没有密钥。加一个没密钥的 Gemini 给规划层，真人发 `!ai hello`：目标没开始，控制权留在真人，界面打开并说明缺密钥。删掉它后规划层回到第一个提供商。AI 控制时拦下这个界面的那段代码没有单独测 | $0 |

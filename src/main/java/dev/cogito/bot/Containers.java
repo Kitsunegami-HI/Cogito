@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -141,7 +142,7 @@ final class Containers {
     }
 
     private static String dimension() {
-        return Bot.level().dimension().identifier().toString();
+        return Mc.dimension(Bot.level());
     }
 
     /** Client thread. What the open window shows of the chest at pos, kept. Nothing happens for a window that is not a chest. */
@@ -308,7 +309,7 @@ final class Containers {
     private static JsonObject findJson(String item, int radius) {
         BlockPos center = Bot.player().blockPosition();
         boolean keyed = item.contains("#") && !item.startsWith("#");
-        String key = keyed ? Bot.id(item.substring(0, item.indexOf('#'))) + "#" + Bot.id(item.substring(item.indexOf('#') + 1)) : null;
+        String key = keyed ? Mc.id(item.substring(0, item.indexOf('#'))) + "#" + Mc.id(item.substring(item.indexOf('#') + 1)) : null;
         List<Known> chests = keyed ? holdingKey(key, radius) : holding(Bot.item(item), radius);
         JsonArray rows = new JsonArray();
         for (Known known : chests) {

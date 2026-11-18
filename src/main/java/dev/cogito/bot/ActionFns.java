@@ -1,5 +1,6 @@
 package dev.cogito.bot;
 
+import dev.cogito.compat.Mc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import dev.cogito.Config;
@@ -168,7 +169,7 @@ final class ActionFns {
             activateAt(Bot.pos(args));
             boolean asleep = Bot.waitUntil(() -> Bot.player().isSleeping(), 2000);
             if (asleep) {
-                String dimension = Bot.call(() -> Bot.level().dimension().identifier().toString());
+                String dimension = Bot.call(() -> Mc.dimension(Bot.level()));
                 MemoryStore.notePlace("bed", Bot.pos(args), dimension, "last slept here; this is where you come back after dying");
             }
             return J.obj("sleeping", asleep);

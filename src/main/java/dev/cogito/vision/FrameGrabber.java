@@ -3,7 +3,7 @@ package dev.cogito.vision;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.cogito.bot.ApiError;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Screenshot;
+import dev.cogito.compat.Frames;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -35,7 +35,7 @@ public final class FrameGrabber {
         Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> {
             try {
-                Screenshot.takeScreenshot(mc.getMainRenderTarget(), pending::complete);
+                Frames.capture(pending::complete);
             } catch (RuntimeException e) {
                 pending.completeExceptionally(e);
             }
@@ -79,14 +79,14 @@ public final class FrameGrabber {
                     int n = 0;
                     for (int sy = sy0; sy < sy1; sy++) {
                         for (int sx = sx0; sx < sx1; sx++) {
-                            int abgr = full.getPixel(sx, sy);
-                            r += abgr & 0xFF;
-                            g += (abgr >> 8) & 0xFF;
-                            b += (abgr >> 16) & 0xFF;
+                            int packed = Frames.pixel(full, sx, sy);
+                            r += packed & 0xFF;
+                            g += (packed >> 8) & 0xFF;
+                            b += (packed >> 16) & 0xFF;
                             n++;
                         }
                     }
-                    out.setPixel(x, y, 0xFF000000 | (int) (b / n) << 16 | (int) (g / n) << 8 | (int) (r / n));
+                    Frames.setPixel(out, x, y, 0xFF000000 | (int) (b / n) << 16 | (int) (g / n) << 8 | (int) (r / n));
                 }
             }
             Path temp = Files.createTempFile("cogito-frame", ".png");

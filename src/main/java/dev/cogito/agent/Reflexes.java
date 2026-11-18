@@ -1,5 +1,6 @@
 package dev.cogito.agent;
 
+import dev.cogito.compat.Mc;
 import dev.cogito.Config;
 import dev.cogito.bot.ApiError;
 import dev.cogito.bot.Bot;
@@ -22,11 +23,11 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.animal.golem.IronGolem;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.monster.Creeper;
@@ -35,7 +36,7 @@ import net.minecraft.world.entity.monster.warden.Warden;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.food.FoodProperties;
-import net.minecraft.world.inventory.ContainerInput;
+import dev.cogito.compat.Click;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -326,7 +327,7 @@ public final class Reflexes {
         if (threat != null) {
             // A pickaxe loses a straight fight with a zombie, so with nothing better in hand it is time to go much sooner.
             boolean weak = player.getHealth() <= (bestWeaponDamage(player) < DECENT_WEAPON ? HEALTH_LOW_UNARMED : HEALTH_LOW);
-            boolean hopeless = threat instanceof Warden || threat instanceof IronGolem || threat instanceof WitherBoss;
+            boolean hopeless = threat instanceof Warden || threat.getType() == EntityType.IRON_GOLEM || threat instanceof WitherBoss;
             boolean fuseLit = threat instanceof Creeper creeper && creeper.getSwelling(0f) > 0f;
             // One at a time a fight is won; a crowd only wears the body down, and it stops it from getting anywhere.
             boolean crowded = crowd(player).size() >= CROWD;
@@ -470,10 +471,10 @@ public final class Reflexes {
             if (weapon >= Inventory.getSelectionSize()) {
                 // A better one deep in the pack comes to the hand: what obtain made goes wherever there was room.
                 int place = Bot.hotbarPlaceToBorrow(player.getInventory());
-                mc.gameMode.handleContainerInput(player.inventoryMenu.containerId, weapon, place, ContainerInput.SWAP, player);
+                Mc.click(player.inventoryMenu.containerId, weapon, place, Click.SWAP, player);
                 weapon = place;
             }
-            if (weapon >= 0 && weapon != player.getInventory().getSelectedSlot()) {
+            if (weapon >= 0 && weapon != Mc.selectedSlot(player.getInventory())) {
                 VirtualInput.tapMapping(options().keyHotbarSlots[weapon]);
             }
         }
@@ -568,7 +569,7 @@ public final class Reflexes {
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos pos : BlockPos.betweenClosed(at.offset(-7, -2, -7), at.offset(7, 4, 7))) {
             BlockState floor = level.getBlockState(pos.below());
-            if (level.getBlockState(pos).isAir() && level.getBlockState(pos.above()).isAir() && floor.isSolidRender() && !isMagma(floor)) {
+            if (level.getBlockState(pos).isAir() && level.getBlockState(pos.above()).isAir() && Mc.solidRender(floor, level, pos.below()) && !isMagma(floor)) {
                 double distance = pos.distSqr(at);
                 if (distance < bestDistance) {
                     bestDistance = distance;
@@ -664,13 +665,13 @@ public final class Reflexes {
         if (slot < 0) {
             return;
         }
-        slotBeforeEating = player.getInventory().getSelectedSlot();
+        slotBeforeEating = Mc.selectedSlot(player.getInventory());
         if (slot < Inventory.getSelectionSize()) {
             VirtualInput.tapMapping(options().keyHotbarSlots[slot]);
         } else {
             // What opening the inventory and pressing a number key over the slot sends, without the moment of blindness.
             int place = Bot.hotbarPlaceToBorrow(player.getInventory());
-            mc.gameMode.handleContainerInput(player.inventoryMenu.containerId, slot, place, ContainerInput.SWAP, player);
+            Mc.click(player.inventoryMenu.containerId, slot, place, Click.SWAP, player);
             VirtualInput.tapMapping(options().keyHotbarSlots[place]);
         }
     }
